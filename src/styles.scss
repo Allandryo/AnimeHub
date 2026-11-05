@@ -1,0 +1,640 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap');
+
+/* Ethereal Slate Design System - High-End Visual Design */
+
+:root {
+  // Brand Colors — Ethereal Slate Light palette
+  --primary: #ff6b6b; // Rich Coral
+  --primary-hover: #e05353;
+  --primary-subtle: rgba(255, 107, 107, 0.08);
+  --primary-hsl: 0 95% 55%; // for radial gradients
+  --secondary: #6c63ff; // Soft Indigo
+  --secondary-hover: #564eff;
+  --secondary-hsl: 245 85% 65%;
+  --accent: #4ecdc4; // Mint Green / Tertiary
+
+  // Semantic Colors
+  --success: #0f766e; // Teal-700
+  --warning: #f59e0b;
+  --danger: #e53e3e;
+
+  // Light Theme Palette — Light Ethereal Slate
+  --bg-dark: #f1f5f9; // slate-100
+  --bg-deep: #f8fafc; // slate-50
+
+  --surface: #ffffff;
+  --surface-card: rgba(255, 255, 255, 0.85);
+  --surface-card-hover: rgba(255, 255, 255, 0.98);
+  --surface-elevated: #fdfcf9;
+
+  --border: #e2e8f0; // slate-200
+  --border-focus: #ff6b6b;
+  --border-hover: #cbd5e1; // slate-300
+
+  // Typography
+  --font-heading: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  // Text Colors (Light Ethereal Slate tones)
+  --text-primary: #0f172a; // slate-900
+  --text-secondary: #475569; // slate-600
+  --text-muted: #64748b; // slate-500
+
+  // Transitions - Custom cubic-beziers for spring physics
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-slow: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+
+  // Shadows & Radii - Layered depth system
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 20px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.1);
+  --shadow-2xl: 0 24px 64px rgba(15, 23, 42, 0.12);
+  --radius-sm: 6px;
+  --radius-md: 10px; // base roundness
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  // Z-Index Scale
+  --z-sticky: 100;
+  --z-mobile-nav: 101;
+  --z-mobile-backdrop: 102;
+  --z-dropdown: 1050;
+  --z-modal-backdrop: 1000;
+  --z-modal: 1001;
+  --z-toast: 1100;
+  --z-tooltip: 1200;
+}
+
+// Resets
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+  background-color: var(--bg-deep);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: 
+    radial-gradient(ellipse at 20% 0%, rgba(255, 107, 107, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(108, 99, 255, 0.03) 0%, transparent 50%),
+    var(--bg-deep);
+  background-attachment: fixed;
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+}
+
+// Custom Scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.1);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: var(--transition-fast);
+  &:hover {
+    background: rgba(15, 23, 42, 0.2);
+    background-clip: padding-box;
+  }
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+// Selection
+::selection {
+  background: rgba(255, 107, 107, 0.2);
+  color: var(--text-primary);
+}
+
+// Typography Global Styles
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.25rem); }
+h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
+h4 { font-size: clamp(1.1rem, 2vw, 1.35rem); }
+
+p {
+  line-height: 1.7;
+  max-width: 75ch;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: var(--transition-fast);
+  &:hover {
+    color: var(--primary);
+  }
+}
+
+// Global Layout & Containers
+.container {
+  width: 100%;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+
+  @media (max-width: 640px) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+// Section spacing rhythm
+section {
+  padding-block: 4rem;
+  @media (max-width: 768px) {
+    padding-block: 3rem;
+  }
+}
+
+// ============================================
+// DOUBLE-BEZEL ARCHITECTURE (Doppelrand)
+// Outer shell + inner core for haptic depth
+// ============================================
+
+// Outer shell - the "tray"
+.surface-shell {
+  position: relative;
+  border-radius: var(--radius-xl);
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid var(--border);
+  padding: 1.5px; // hairline outer border
+  box-shadow: var(--shadow-xs);
+  backdrop-filter: blur(4px);
+}
+
+// Inner core - the "plate"
+.surface-core {
+  border-radius: calc(var(--radius-xl) - 1.5px);
+  background: var(--surface-card);
+  border: 1px solid transparent; // inner highlight handled via shadow
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  transition: var(--transition-normal);
+}
+
+.surface-shell:hover .surface-core {
+  background: var(--surface-card-hover);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), var(--shadow-md);
+}
+
+// Single card variant (simpler, for lists)
+.surface-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-normal);
+  backdrop-filter: blur(8px);
+
+  &:hover {
+    background: var(--surface-card-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+// Panel variant (for larger areas)
+.surface-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+}
+
+// Interactive states
+.scale-on-press {
+  transition: var(--transition-fast);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+// Focus visible for accessibility
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+// ============================================
+// BUTTON SYSTEM - Button-in-Button Architecture
+// ============================================
+
+// Primary CTA - Solid coral with nested icon wrapper
+.btn-primary {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  background: var(--primary);
+  color: #0b0d11;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-spring);
+  user-select: none;
+  font-size: 0.9rem;
+  position: relative;
+  overflow: hidden;
+
+  // Nested trailing icon wrapper (button-in-button)
+  .btn-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-full);
+    background: rgba(11, 13, 17, 0.1);
+    margin-left: 0.25rem;
+    margin-right: -0.5rem;
+    transition: var(--transition-spring);
+    transform: translateX(0);
+  }
+
+  &:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+
+    .btn-icon-wrapper {
+      background: rgba(11, 13, 17, 0.15);
+      transform: translateX(4px);
+    }
+  }
+
+  &:active {
+    transform: scale(0.97) translateY(0);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-fast);
+  }
+
+  &:disabled {
+    background: var(--border);
+    color: var(--text-muted);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+
+    .btn-icon-wrapper {
+      background: transparent;
+      transform: translateX(0);
+    }
+  }
+}
+
+// Gradient alias for backward compat
+.btn-gradient {
+  @extend .btn-primary;
+}
+
+// Secondary / Outline
+.btn-outline {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition-normal);
+  user-select: none;
+  font-size: 0.9rem;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(255, 107, 107, 0.3);
+    color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  &:active {
+    background: rgba(0, 0, 0, 0.08);
+    transform: scale(0.98);
+  }
+}
+
+// Glass alias
+.btn-glass {
+  @extend .btn-outline;
+}
+
+// Ghost button (minimal)
+.btn-ghost {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 0.85rem;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
+    border-color: var(--border);
+  }
+
+  &:active {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
+// Icon-only button
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: var(--border-hover);
+    color: var(--primary);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// Text utilities - Gradient text banned per design.md
+// Use solid colors only for accessibility and premium feel
+
+// ============================================
+// FORMS - Elevated input design
+// ============================================
+
+.input-field {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: var(--transition-normal);
+  outline: none;
+  width: 100%;
+  backdrop-filter: blur(8px);
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:hover {
+    border-color: var(--border-hover);
+  }
+
+  &:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px var(--primary-subtle);
+    background: var(--surface);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Backward compat
+.input-glass {
+  @extend .input-field;
+}
+
+// Select styling
+.select-field {
+  @extend .input-field;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 3rem;
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .error-message {
+    font-size: 0.75rem;
+    color: var(--danger);
+  }
+}
+
+// ============================================
+// ICON HELPERS
+// ============================================
+
+.material-symbols-outlined {
+  font-size: 1.25rem;
+  vertical-align: middle;
+  user-select: none;
+  font-variation-settings: 'wght' 400;
+
+  &.icon-lg {
+    font-size: 2rem;
+  }
+
+  &.icon-sm {
+    font-size: 1rem;
+  }
+
+  &.icon-xs {
+    font-size: 0.85rem;
+  }
+
+  &.fill {
+    font-variation-settings: 'FILL' 1;
+  }
+}
+
+// ============================================
+// SKELETON SHIMMER LOADING
+// ============================================
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.03) 25%,
+    rgba(15, 23, 42, 0.08) 37%,
+    rgba(15, 23, 42, 0.03) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+// Skeleton block (used for cards)
+.skeleton-block {
+  @extend .shimmer;
+  border-radius: var(--radius-md);
+}
+
+// ============================================
+// BADGE SYSTEM
+// ============================================
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  color: var(--text-secondary);
+  font-family: var(--font-heading);
+  white-space: nowrap;
+
+  &.badge-primary {
+    background: var(--primary-subtle);
+    border-color: rgba(255, 107, 107, 0.15);
+    color: var(--primary);
+  }
+
+  &.badge-secondary {
+    background: rgba(108, 99, 255, 0.08);
+    border-color: rgba(108, 99, 255, 0.15);
+    color: var(--secondary);
+  }
+
+  &.badge-success {
+    background: rgba(15, 118, 110, 0.08);
+    border-color: rgba(15, 118, 110, 0.16);
+    color: var(--success);
+  }
+
+  &.badge-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.18);
+    color: var(--warning);
+  }
+}
+
+// Badge pill variant (rounder)
+.badge-pill {
+  @extend .badge;
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.75rem;
+  font-size: 0.7rem;
+}
+
+// ============================================
+// ANIMATION KEYFRAMES
+// ============================================
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// ============================================
+// BACKWARD COMPAT ALIASES
+// ============================================
+
+.glass-panel {
+  @extend .surface-panel;
+}
+
+.glass-card {
+  @extend .surface-card;
+}
