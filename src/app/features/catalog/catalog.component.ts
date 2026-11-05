@@ -206,12 +206,14 @@ interface SectionData {
         <main class="catalog-content">
           @if (showResults()) {
             <section class="results-area">
-              @if (!loading() || results().length > 0) {
+              @if (!loading() || animes().length > 0) {
                 <div class="results-header">
                   <span class="results-count">
                     <span class="material-symbols-outlined icon-sm">dashboard</span>
-                    @if (totalResults() > 0) {
-                      {{ totalResults() }} resultados encontrados
+                    @if (hasExactTotal() && totalResults() > 0) {
+                      {{ totalResults() }} resultados encontrados @if (knownTotalPages() && knownTotalPages()! > 1) { <span class="page-indicator">· Pág. {{ currentPage() }} de {{ knownTotalPages() }}</span> }
+                    } @else if (animes().length > 0) {
+                      Explorando catálogo <span class="page-indicator">· Pág. {{ currentPage() }}</span>
                     } @else if (!loading()) {
                       Sin resultados
                     }
@@ -224,18 +226,18 @@ interface SectionData {
               }
 
               <div class="results-grid">
-                @for (anime of results(); track anime.mal_id) {
-                  <app-anime-card [anime]="anime" />
-                }
-
-                @if (loading()) {
+                @if (loading() && animes().length === 0) {
                   @for (i of skeletonCards; track i) {
                     <app-skeleton-card />
+                  }
+                } @else {
+                  @for (anime of animes(); track anime.id) {
+                    <app-anime-card [anime]="anime" />
                   }
                 }
               </div>
 
-              @if (!loading() && results().length === 0 && hasSearched()) {
+              @if (!loading() && animes().length === 0 && hasSearched()) {
                 <div class="empty-state">
                   <div class="empty-icon">
                     <span class="material-symbols-outlined">search_off</span>
@@ -249,20 +251,100 @@ interface SectionData {
                 </div>
               }
 
-              @if (hasNextPage() && !loading() && results().length > 0) {
-                <div class="load-more-wrapper">
-                  <button class="btn-primary load-more-btn" (click)="loadMore()">
-                    <span class="material-symbols-outlined">expand_more</span>
-                    Cargar más
-                  </button>
-                </div>
-              }
+              <!-- Controles de Paginación Reactiva (20 animes por página, hasta 3 páginas antes/después con la actual centrada) -->
+              @if (!loading() && animes().length > 0 && (visiblePages().length > 1 || hasNextPage() || currentPage() > 1)) {
+                <nav class="pagination-container" aria-label="Navegación de páginas">
+                  <div class="pagination-info">
+                    @if (hasExactTotal() && knownTotalPages()) {
+                      <span>Página <strong>{{ currentPage() }}</strong> de <strong>{{ knownTotalPages() }}</strong></span>
+                      @if (totalResults() > 0) {
+                        <span class="pagination-total">({{ totalResults() }} animes)</span>
+                      }
+                    } @else {
+                      <span>Página <strong>{{ currentPage() }}</strong></span>
+                      <span class="pagination-total">(20 animes por página)</span>
+                    }
+                  </div>
 
-              @if (loadingMore()) {
-                <div class="loading-more">
-                  <div class="spinner"></div>
-                  <span>Cargando más resultados...</span>
-                </div>
+                  <div class="pagination-controls">
+                    <!-- Primera página -->
+                    @if (currentPage() > 2) {
+                      <button
+                        class="page-nav-btn"
+                        [disabled]="currentPage() === 1 || loading()"
+                        (click)="goToPage(1)"
+                        title="Primera página"
+                        aria-label="Primera página"
+                      >
+                        <span class="material-symbols-outlined">first_page</span>
+                      </button>
+                    }
+
+                    <!-- Página anterior -->
+                    <button
+                      class="page-nav-btn"
+                      [disabled]="currentPage() === 1 || loading()"
+                      (click)="prevPage()"
+                      title="Página anterior"
+                      aria-label="Página anterior"
+                    >
+                      <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+
+                    <!-- Salto al inicio si el rango está alejado -->
+                    @if (showFirstEllipsis()) {
+                      <button class="page-num-btn" [disabled]="loading()" (click)="goToPage(1)">1</button>
+                      <span class="pagination-ellipsis">…</span>
+                    } @else if (showFirstPage()) {
+                      <button class="page-num-btn" [disabled]="loading()" (click)="goToPage(1)">1</button>
+                    }
+
+                    <!-- Páginas visibles: hasta 3 antes, página actual centrada, hasta 3 después -->
+                    @for (page of visiblePages(); track page) {
+                      <button
+                        class="page-num-btn"
+                        [class.active]="page === currentPage()"
+                        [attr.aria-current]="page === currentPage() ? 'page' : null"
+                        [disabled]="loading()"
+                        (click)="goToPage(page)"
+                      >
+                        {{ page }}
+                      </button>
+                    }
+
+                    <!-- Salto al final si el rango está alejado (solo si conocemos el total real) -->
+                    @if (showLastEllipsis()) {
+                      <span class="pagination-ellipsis">…</span>
+                      <button class="page-num-btn" [disabled]="loading()" (click)="goToPage(knownTotalPages()!)">{{ knownTotalPages() }}</button>
+                    } @else if (showLastPage()) {
+                      <button class="page-num-btn" [disabled]="loading()" (click)="goToPage(knownTotalPages()!)">{{ knownTotalPages() }}</button>
+                    }
+
+                    <!-- Página siguiente -->
+                    <button
+                      class="page-nav-btn"
+                      [disabled]="(!hasNextPage() && (!hasExactTotal() || currentPage() >= (knownTotalPages() ?? 1))) || loading()"
+                      (click)="nextPage()"
+                      title="Página siguiente"
+                      aria-label="Página siguiente"
+                    >
+                      <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+
+                    <!-- Última página (solo si conocemos el total real) -->
+                    @if (hasExactTotal() && knownTotalPages() && currentPage() < knownTotalPages()! - 1) {
+                      <button
+                        class="page-nav-btn"
+                        [disabled]="currentPage() >= knownTotalPages()! || loading()"
+                        (click)="goToPage(knownTotalPages()!)"
+                        title="Última página"
+                        aria-label="Última página"
+                      >
+                        <span class="material-symbols-outlined">last_page</span>
+                      </button>
+                    }
+                  </div>
+                </nav>
               }
             </section>
           } @else {
@@ -317,7 +399,7 @@ interface SectionData {
                           <app-skeleton-card />
                         }
                       } @else {
-                        @for (anime of getVisibleSectionItems(section); track anime.mal_id) {
+                        @for (anime of getVisibleSectionItems(section); track anime.id) {
                           <app-anime-card [anime]="anime" />
                         }
                       }
@@ -824,25 +906,134 @@ interface SectionData {
       }
     }
 
-    .load-more-wrapper {
+    .page-indicator {
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-left: 0.25rem;
+    }
+
+    .pagination-container {
       display: flex;
-      justify-content: center;
-      margin-top: 2.5rem;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      margin-top: 3rem;
+      padding: 1.5rem 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
     }
 
-    .load-more-btn {
-      padding: 0.8rem 2.5rem;
-      font-size: 0.95rem;
+    .pagination-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+
+      strong {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      .pagination-total {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
     }
 
-    .loading-more {
+    .pagination-controls {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
-      padding: 2rem;
-      color: var(--text-muted);
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .page-nav-btn,
+    .page-num-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 40px;
+      height: 40px;
+      padding: 0 0.65rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      font-family: var(--font-heading);
       font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      user-select: none;
+
+      &:hover:not(:disabled):not(.active) {
+        background: rgba(255, 107, 107, 0.1);
+        border-color: rgba(255, 107, 107, 0.4);
+        color: var(--text-primary);
+        transform: translateY(-2px);
+      }
+
+      &:active:not(:disabled) {
+        transform: scale(0.96);
+      }
+
+      &.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(255, 107, 107, 0.35);
+        cursor: default;
+      }
+
+      &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        border-color: var(--border);
+      }
+
+      .material-symbols-outlined {
+        font-size: 1.25rem;
+      }
+    }
+
+    .pagination-ellipsis {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 40px;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 1rem;
+      user-select: none;
+    }
+
+    @media (max-width: 640px) {
+      .pagination-container {
+        padding: 1.25rem 0.5rem;
+        margin-top: 2rem;
+      }
+
+      .page-nav-btn,
+      .page-num-btn {
+        min-width: 36px;
+        height: 36px;
+        padding: 0 0.4rem;
+        font-size: 0.82rem;
+
+        .material-symbols-outlined {
+          font-size: 1.1rem;
+        }
+      }
+
+      .pagination-controls {
+        gap: 0.25rem;
+      }
     }
 
     .spinner {
@@ -894,13 +1085,70 @@ export class CatalogComponent implements OnInit, OnDestroy {
   ]);
 
   searchQuery = signal('');
-  results = signal<Anime[]>([]);
+  animes = signal<Anime[]>([]);
+  results = this.animes;
   loading = signal(false);
   loadingMore = signal(false);
   hasSearched = signal(false);
   totalResults = signal(0);
+  knownTotalPages = signal<number | null>(null);
+  hasExactTotal = signal(false);
   hasNextPage = signal(false);
   currentPage = signal(1);
+
+  totalPages = computed(() => this.knownTotalPages() ?? 1);
+
+  // Paginación: rango visible con la página actual en el centro (hasta 3 antes y 3 después)
+  visiblePages = computed(() => {
+    const current = this.currentPage();
+    const exactTotal = this.knownTotalPages();
+
+    if (exactTotal !== null) {
+      if (exactTotal <= 1) return [];
+      const start = Math.max(1, current - 3);
+      const end = Math.min(exactTotal, current + 3);
+      const pages: number[] = [];
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      return pages;
+    }
+
+    // Si AniList no da un total exacto (tope artificial 250 / 5000):
+    // La página actual en el centro: hasta 3 páginas antes y hasta 3 páginas después (si hay siguiente página)
+    const start = Math.max(1, current - 3);
+    const end = this.hasNextPage() ? current + 3 : current;
+
+    const pages: number[] = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
+  showFirstEllipsis = computed(() => {
+    const current = this.currentPage();
+    return Math.max(1, current - 3) > 2;
+  });
+
+  showFirstPage = computed(() => {
+    const current = this.currentPage();
+    return Math.max(1, current - 3) === 2;
+  });
+
+  showLastEllipsis = computed(() => {
+    const total = this.knownTotalPages();
+    if (!total || !this.hasExactTotal()) return false;
+    const current = this.currentPage();
+    return Math.min(total, current + 3) < total - 1;
+  });
+
+  showLastPage = computed(() => {
+    const total = this.knownTotalPages();
+    if (!total || !this.hasExactTotal()) return false;
+    const current = this.currentPage();
+    return Math.min(total, current + 3) === total - 1;
+  });
 
   genres = signal<Genre[]>([]);
   selectedGenres = signal<number[]>([]);
@@ -936,7 +1184,7 @@ export class CatalogComponent implements OnInit, OnDestroy {
     { value: 'upcoming', label: 'Próximamente' }
   ];
   yearOptions: number[] = [];
-  skeletonCards = Array.from({ length: 12 }, (_, i) => i);
+  skeletonCards = Array.from({ length: 20 }, (_, i) => i);
   skeletonGenres = Array.from({ length: 10 }, (_, i) => i);
   carouselSkeletons = Array.from({ length: 5 }, (_, i) => i);
   private readonly carouselStep = 5;
@@ -969,7 +1217,7 @@ export class CatalogComponent implements OnInit, OnDestroy {
         if (this.showResults()) {
           this.executeSearch();
         } else {
-          this.results.set([]);
+          this.animes.set([]);
           this.totalResults.set(0);
           this.hasSearched.set(false);
         }
@@ -1024,8 +1272,10 @@ export class CatalogComponent implements OnInit, OnDestroy {
         if (this.showResults()) {
           this.executeSearch();
         } else {
-          this.results.set([]);
+          this.animes.set([]);
           this.totalResults.set(0);
+          this.knownTotalPages.set(null);
+          this.hasExactTotal.set(false);
           this.hasSearched.set(false);
           this.hasNextPage.set(false);
         }
@@ -1089,9 +1339,11 @@ export class CatalogComponent implements OnInit, OnDestroy {
     this.selectedStatus.set(null);
     this.selectedSort.set(null);
     this.currentPage.set(1);
-    this.results.set([]);
+    this.animes.set([]);
     this.hasSearched.set(false);
     this.totalResults.set(0);
+    this.knownTotalPages.set(null);
+    this.hasExactTotal.set(false);
     this.hasNextPage.set(false);
 
     this.genresExpanded.set(false);
@@ -1107,15 +1359,51 @@ export class CatalogComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadMore(): void {
-    this.currentPage.update(p => p + 1);
+  goToPage(page: number): void {
+    if (page < 1 || page === this.currentPage()) {
+      return;
+    }
+    if (this.hasExactTotal() && this.knownTotalPages() && page > this.knownTotalPages()!) {
+      return;
+    }
+    this.currentPage.set(page);
     this.syncFiltersToUrl();
-    this.executeSearch(true);
+    this.executeSearch();
+    this.scrollToResultsTop();
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.goToPage(this.currentPage() - 1);
+    }
+  }
+
+  nextPage(): void {
+    if (this.hasNextPage()) {
+      this.goToPage(this.currentPage() + 1);
+    } else if (this.hasExactTotal() && this.knownTotalPages() && this.currentPage() < this.knownTotalPages()!) {
+      this.goToPage(this.currentPage() + 1);
+    }
+  }
+
+  loadMore(): void {
+    this.nextPage();
+  }
+
+  private scrollToResultsTop(): void {
+    if (typeof window !== 'undefined') {
+      const el = document.querySelector('.results-area') || document.querySelector('.main-content');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   }
 
   private onFilterChange(): void {
     this.currentPage.set(1);
-    this.results.set([]);
+    this.animes.set([]);
+    this.knownTotalPages.set(null);
+    this.hasExactTotal.set(false);
     this.syncFiltersToUrl();
     if (this.showResults()) {
       this.executeSearch();
@@ -1150,13 +1438,6 @@ export class CatalogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (append) {
-      this.loadingMore.set(true);
-    } else {
-      this.loading.set(true);
-    }
-    this.hasSearched.set(true);
-
     const filters: {
       q?: string;
       page?: number;
@@ -1176,6 +1457,27 @@ export class CatalogComponent implements OnInit, OnDestroy {
     if (this.selectedStatus()) filters.status = this.selectedStatus()!;
     if (this.selectedSort()) filters.sort = this.selectedSort()!;
 
+    // ⚡ Caché inteligente antes del fetch/HttpClient:
+    // Si la página ya está en memoria o en sessionStorage, actualizamos instantáneamente
+    // las Signals sin latencia de red ni provocar error 429 (Rate Limit).
+    const cacheKey = this.anilistService.getPageCacheKey(filters);
+    const cached = this.anilistService.getCachedPage(cacheKey);
+
+    if (cached) {
+      this.hasSearched.set(true);
+      this.applySearchResults(cached, append);
+      this.loading.set(false);
+      this.loadingMore.set(false);
+      return;
+    }
+
+    if (append) {
+      this.loadingMore.set(true);
+    } else {
+      this.loading.set(true);
+    }
+    this.hasSearched.set(true);
+
     if (!append && this.searchSubscription) {
       this.searchSubscription.unsubscribe();
     }
@@ -1187,24 +1489,65 @@ export class CatalogComponent implements OnInit, OnDestroy {
       })
     ).subscribe({
       next: response => {
-        if (append) {
-          this.results.update(prev => [...prev, ...response.data]);
-        } else {
-          this.results.set(response.data);
-        }
-        this.totalResults.set(response.pagination?.items?.total ?? response.data.length);
-        this.hasNextPage.set(response.pagination?.has_next_page ?? false);
+        this.applySearchResults(response, append);
       },
       error: err => {
         console.error('Search error:', err);
         if (!append) {
-          this.results.set([]);
+          this.animes.set([]);
           this.totalResults.set(0);
+          this.knownTotalPages.set(null);
+          this.hasExactTotal.set(false);
+          this.hasNextPage.set(false);
         }
       }
     });
 
     this.subscriptions.add(this.searchSubscription);
+  }
+
+  private applySearchResults(
+    response: import('../../core/services/anilist.service').AnilistResponse<Anime[]>,
+    append = false
+  ): void {
+    if (append) {
+      this.animes.update(prev => [...prev, ...response.data]);
+    } else {
+      this.animes.set(response.data);
+    }
+
+    const rawTotal = response.pagination?.items?.total ?? response.data.length;
+    const rawLastPage = response.pagination?.last_visible_page || 1;
+    const hasNext = response.pagination?.has_next_page ?? false;
+
+    // La API de AniList limita artificialmente las consultas grandes a 5000 items (250 páginas de 20).
+    // Si el resultado trae ese tope por defecto, no es un conteo real.
+    const isDefaultApiCap = rawLastPage >= 250 || rawTotal >= 5000;
+
+    if (!hasNext) {
+      // Ya no hay más páginas posteriores: conocemos exactamente la última página
+      const finalPage = response.data.length > 0 ? this.currentPage() : Math.max(1, this.currentPage() - 1);
+      this.knownTotalPages.set(finalPage);
+      this.hasExactTotal.set(true);
+      const computedTotal = response.data.length > 0
+        ? (this.currentPage() - 1) * 20 + response.data.length
+        : rawTotal;
+      this.totalResults.set(computedTotal);
+      this.hasNextPage.set(false);
+    } else if (!isDefaultApiCap) {
+      // Conteo real exacto calculado por AniList (búsquedas con pocos resultados)
+      this.knownTotalPages.set(rawLastPage);
+      this.hasExactTotal.set(true);
+      this.totalResults.set(rawTotal);
+      this.hasNextPage.set(this.currentPage() < rawLastPage);
+    } else {
+      // Consulta con más páginas de las visibles inicialmente:
+      // Se navega dinámicamente con ventana centrada (+-3 páginas) sin mostrar el número falso de 250
+      this.hasExactTotal.set(false);
+      this.knownTotalPages.set(null);
+      this.totalResults.set(rawTotal);
+      this.hasNextPage.set(true);
+    }
   }
 
   private loadSection(

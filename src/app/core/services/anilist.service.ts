@@ -4,9 +4,15 @@ import { Observable, of } from 'rxjs';
 import { map, shareReplay, catchError, tap } from 'rxjs/operators';
 
 export interface Anime {
+  id: number;
   mal_id: number;
   title: string;
   title_english?: string;
+  coverImage?: {
+    large?: string;
+    extraLarge?: string;
+    medium?: string;
+  };
   banner_image?: string;
   images: {
     webp?: {
@@ -21,6 +27,7 @@ export interface Anime {
     };
   };
   score?: number;
+  averageScore?: number;
   scored_by?: number;
   synopsis?: string;
   type?: string;
@@ -101,17 +108,40 @@ const GENRE_LIST = [
 const GENRE_ID_TO_NAME = new Map<number, string>(GENRE_LIST.map(g => [g.mal_id, g.name]));
 const GENRE_NAME_TO_ID = new Map<string, number>(GENRE_LIST.map(g => [g.name.toLowerCase(), g.mal_id]));
 
-const MEDIA_FRAGMENT = `
-  fragment AnimeFields on Media {
+/**
+ * ⚡ Fragmento optimizado para catálogos y listados paginados.
+ * Solicita ÚNICAMENTE los campos indispensables:
+ * id, title { romaji english }, coverImage { large }, averageScore, episodes, status.
+ * Se evita pedir extraLarge, description, studios, etc. para no saturar la red ni bloquear el hilo principal.
+ */
+const CATALOG_MEDIA_FRAGMENT = `
+  fragment CatalogMedia on Media {
     id
-    idMal
+    title {
+      romaji
+      english
+    }
+    coverImage {
+      large
+    }
+    averageScore
+    episodes
+    status
+  }
+`;
+
+/**
+ * Fragmento completo utilizado exclusivamente en la vista de detalle (/anime/:id).
+ */
+const DETAIL_MEDIA_FRAGMENT = `
+  fragment DetailMedia on Media {
+    id
     title {
       romaji
       english
       native
     }
     coverImage {
-      extraLarge
       large
       medium
       color
@@ -148,9 +178,11 @@ export class AnilistService {
   private http = inject(HttpClient);
   private anilistUrl = 'https://graphql.anilist.co';
 
+  // Sistema de caché inteligente indexado por clave de página
+  private pageCache = new Map<string, AnilistResponse<Anime[]>>();
   private inMemoryCache = new Map<string, Observable<any>>();
-  private readonly CACHE_PREFIX = 'animehub_cache_v4_';
-  private readonly CACHE_TTL_MS = 30 * 60 * 1000;
+  private readonly CACHE_PREFIX = 'animehub_cache_v5_';
+  private readonly CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
   constructor() {
     this.clearLegacyCaches();
@@ -188,17 +220,76 @@ export class AnilistService {
     return `${this.CACHE_PREFIX}${sanitized}_${hash}`;
   }
 
+  /**
+   * Genera una clave determinista para la caché indexada por página y filtros.
+   */
+  getPageCacheKey(filters: {
+    q?: string;
+    page?: number;
+    genres?: string;
+    score?: number;
+    status?: string;
+    year?: number;
+    sort?: string;
+  }): string {
+    const page = filters.page || 1;
+    const cleanQ = (filters.q || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return `page_${page}_q_${cleanQ}_g_${filters.genres || ''}_sc_${filters.score || ''}_st_${filters.status || ''}_y_${filters.year || ''}_s_${filters.sort || ''}`;
+  }
+
+  /**
+   * Obtiene la respuesta de página de la caché (en memoria o sessionStorage) síncronamente.
+   * Permite actualizar Signals de forma instantánea sin latencia de red ni error 429.
+   */
+  getCachedPage(key: string): AnilistResponse<Anime[]> | null {
+    if (this.pageCache.has(key)) {
+      return this.pageCache.get(key)!;
+    }
+
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        const item = sessionStorage.getItem(this.getStorageKey(key));
+        if (item) {
+          const parsed = JSON.parse(item);
+          if (Date.now() - parsed.timestamp < this.CACHE_TTL_MS) {
+            this.pageCache.set(key, parsed.data);
+            return parsed.data as AnilistResponse<Anime[]>;
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Guarda una página en la caché en memoria y en sessionStorage.
+   */
+  setCachedPage(key: string, data: AnilistResponse<Anime[]>): void {
+    this.pageCache.set(key, data);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(this.getStorageKey(key), JSON.stringify({
+          data,
+          timestamp: Date.now()
+        }));
+      } catch {
+        // Storage quota
+      }
+    }
+  }
+
   private mapAniListMediaToAnime(media: any): Anime {
     if (!media) return null as any;
 
-    const malId = media.id;
-    const title = media.title?.english || media.title?.romaji || media.title?.native || 'Anime';
+    const id = media.id;
+    const title = media.title?.english || media.title?.romaji || 'Anime';
     const titleEnglish = media.title?.english || undefined;
 
-    const largeImg = media.coverImage?.extraLarge || media.coverImage?.large || media.coverImage?.medium || '';
-    const stdImg = media.coverImage?.large || media.coverImage?.medium || '';
-    const smallImg = media.coverImage?.medium || '';
-    const bannerImg = media.bannerImage || largeImg || undefined;
+    // Solo pedimos coverImage.large (evita extraLarge para no saturar la red)
+    const largeImg = media.coverImage?.large || media.coverImage?.medium || '';
 
     const score = media.averageScore ? +(media.averageScore / 10).toFixed(1) : undefined;
 
@@ -231,23 +322,29 @@ export class AnilistService {
     }
 
     return {
-      mal_id: malId,
+      id,
+      mal_id: id,
       title,
       title_english: titleEnglish,
-      banner_image: bannerImg,
+      coverImage: {
+        large: largeImg,
+        medium: media.coverImage?.medium || largeImg
+      },
+      banner_image: media.bannerImage || largeImg || undefined,
       images: {
         webp: {
-          image_url: stdImg,
+          image_url: largeImg,
           large_image_url: largeImg,
-          small_image_url: smallImg
+          small_image_url: media.coverImage?.medium || largeImg
         },
         jpg: {
-          image_url: stdImg,
+          image_url: largeImg,
           large_image_url: largeImg,
-          small_image_url: smallImg
+          small_image_url: media.coverImage?.medium || largeImg
         }
       },
       score,
+      averageScore: media.averageScore,
       scored_by: media.popularity,
       synopsis,
       type: media.format || 'TV',
@@ -320,38 +417,54 @@ export class AnilistService {
   }
 
   getTopAiring(page: number = 1): Observable<AnilistResponse<Anime[]>> {
+    const cacheKey = `top_airing_p${page}`;
+    const cached = this.getCachedPage(cacheKey);
+    if (cached) return of(cached);
+
     const query = `
-      ${MEDIA_FRAGMENT}
+      ${CATALOG_MEDIA_FRAGMENT}
       query ($page: Int, $perPage: Int) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { currentPage hasNextPage lastPage total perPage }
           media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC, isAdult: false) {
-            ...AnimeFields
+            ...CatalogMedia
           }
         }
       }
     `;
 
-    return this.queryGraphQL<any>(query, { page, perPage: 20 }, `top_airing_p${page}`).pipe(
-      map(res => this.mapPageResponse(res, page))
+    return this.queryGraphQL<any>(query, { page, perPage: 20 }, cacheKey).pipe(
+      map(res => {
+        const mapped = this.mapPageResponse(res, page);
+        this.setCachedPage(cacheKey, mapped);
+        return mapped;
+      })
     );
   }
 
   getPopular(page: number = 1): Observable<AnilistResponse<Anime[]>> {
+    const cacheKey = `popular_p${page}`;
+    const cached = this.getCachedPage(cacheKey);
+    if (cached) return of(cached);
+
     const query = `
-      ${MEDIA_FRAGMENT}
+      ${CATALOG_MEDIA_FRAGMENT}
       query ($page: Int, $perPage: Int) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { currentPage hasNextPage lastPage total perPage }
           media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
-            ...AnimeFields
+            ...CatalogMedia
           }
         }
       }
     `;
 
-    return this.queryGraphQL<any>(query, { page, perPage: 20 }, `popular_p${page}`).pipe(
-      map(res => this.mapPageResponse(res, page))
+    return this.queryGraphQL<any>(query, { page, perPage: 20 }, cacheKey).pipe(
+      map(res => {
+        const mapped = this.mapPageResponse(res, page);
+        this.setCachedPage(cacheKey, mapped);
+        return mapped;
+      })
     );
   }
 
@@ -364,13 +477,17 @@ export class AnilistService {
     else if (month >= 8 && month <= 10) currentSeason = 'FALL';
     const currentYear = now.getFullYear();
 
+    const cacheKey = `season_now_${currentSeason}_${currentYear}_p${page}`;
+    const cached = this.getCachedPage(cacheKey);
+    if (cached) return of(cached);
+
     const query = `
-      ${MEDIA_FRAGMENT}
+      ${CATALOG_MEDIA_FRAGMENT}
       query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { currentPage hasNextPage lastPage total perPage }
           media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC, isAdult: false) {
-            ...AnimeFields
+            ...CatalogMedia
           }
         }
       }
@@ -381,44 +498,56 @@ export class AnilistService {
       perPage: 20,
       season: currentSeason,
       seasonYear: currentYear
-    }, `season_now_${currentSeason}_${currentYear}_p${page}`).pipe(
-      map(res => this.mapPageResponse(res, page))
+    }, cacheKey).pipe(
+      map(res => {
+        const mapped = this.mapPageResponse(res, page);
+        this.setCachedPage(cacheKey, mapped);
+        return mapped;
+      })
     );
   }
 
   getRecentUpcoming(page: number = 1): Observable<AnilistResponse<Anime[]>> {
+    const cacheKey = `upcoming_p${page}`;
+    const cached = this.getCachedPage(cacheKey);
+    if (cached) return of(cached);
+
     const query = `
-      ${MEDIA_FRAGMENT}
+      ${CATALOG_MEDIA_FRAGMENT}
       query ($page: Int, $perPage: Int) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { currentPage hasNextPage lastPage total perPage }
           media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) {
-            ...AnimeFields
+            ...CatalogMedia
           }
         }
       }
     `;
 
-    return this.queryGraphQL<any>(query, { page, perPage: 20 }, `upcoming_p${page}`).pipe(
-      map(res => this.mapPageResponse(res, page))
+    return this.queryGraphQL<any>(query, { page, perPage: 20 }, cacheKey).pipe(
+      map(res => {
+        const mapped = this.mapPageResponse(res, page);
+        this.setCachedPage(cacheKey, mapped);
+        return mapped;
+      })
     );
   }
 
   getAnimeDetails(id: number): Observable<Anime> {
     const queryById = `
-      ${MEDIA_FRAGMENT}
+      ${DETAIL_MEDIA_FRAGMENT}
       query ($id: Int) {
         Media(id: $id, type: ANIME) {
-          ...AnimeFields
+          ...DetailMedia
         }
       }
     `;
 
     const queryByMal = `
-      ${MEDIA_FRAGMENT}
+      ${DETAIL_MEDIA_FRAGMENT}
       query ($idMal: Int) {
         Media(idMal: $idMal, type: ANIME) {
-          ...AnimeFields
+          ...DetailMedia
         }
       }
     `;
@@ -529,6 +658,14 @@ export class AnilistService {
     sort?: string;
   }): Observable<AnilistResponse<Anime[]>> {
     const page = filters.page || 1;
+    const cacheKey = this.getPageCacheKey(filters);
+
+    // 1. Verificación instantánea en caché (evita 429 Rate Limit)
+    const cached = this.getCachedPage(cacheKey);
+    if (cached) {
+      return of(cached);
+    }
+
     const hasSearchQuery = !!(filters.q && filters.q.trim().length > 0);
 
     const variables: Record<string, any> = {
@@ -542,7 +679,6 @@ export class AnilistService {
     }
 
     if (filters.score) {
-      // Escala de AniList 0-100: para 7+ estrellas exigimos >= 70 (scoreGreater: 69)
       variables['scoreGreater'] = Math.min(90, filters.score * 10 - 1);
     }
 
@@ -572,8 +708,11 @@ export class AnilistService {
       }
     }
 
+    /**
+     * Consulta GraphQL optimizada: limita a 20 items y pide ÚNICAMENTE los campos indispensables.
+     */
     const query = `
-      ${MEDIA_FRAGMENT}
+      ${CATALOG_MEDIA_FRAGMENT}
       query (
         $page: Int,
         $perPage: Int,
@@ -596,17 +735,18 @@ export class AnilistService {
             genre_in: $genres,
             sort: $sort
           ) {
-            ...AnimeFields
+            ...CatalogMedia
           }
         }
       }
     `;
 
-    const cleanQ = (filters.q || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const searchCacheKey = `search_${cleanQ}_g${filters.genres || ''}_sc${filters.score || ''}_st${filters.status || ''}_y${filters.year || ''}_p${page}_${this.hashString(JSON.stringify(variables))}`;
-
-    return this.queryGraphQL<any>(query, variables, searchCacheKey).pipe(
-      map(res => this.mapPageResponse(res, page))
+    return this.queryGraphQL<any>(query, variables, cacheKey).pipe(
+      map(res => {
+        const mapped = this.mapPageResponse(res, page);
+        this.setCachedPage(cacheKey, mapped);
+        return mapped;
+      })
     );
   }
 

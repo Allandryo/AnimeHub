@@ -10,13 +10,15 @@ import { WatchlistService } from '../../../core/services/watchlist.service';
   standalone: true,
   imports: [CommonModule, RouterLink, StatusBadgeComponent],
   template: `
-    <a [routerLink]="['/anime', anime.mal_id]" class="card" [title]="anime.title">
+    <a [routerLink]="['/anime', anime.id || anime.mal_id]" class="card" [title]="anime.title">
       <div class="poster-wrapper">
         <img
-          [src]="anime.images.webp?.large_image_url || anime.images.jpg.large_image_url || anime.images.jpg.image_url"
+          [src]="anime.coverImage?.large || anime.images.webp?.large_image_url || anime.images.jpg.large_image_url || anime.images.jpg.image_url"
           [alt]="anime.title"
           class="poster"
           loading="lazy"
+          decoding="async"
+          referrerpolicy="no-referrer"
         />
         <div class="poster-overlay">
           <div class="overlay-actions">
@@ -274,6 +276,6 @@ export class AnimeCardComponent {
   private watchlistService = inject(WatchlistService);
 
   get watchlistItem() {
-    return this.watchlistService.getWatchlistItem(this.anime?.mal_id);
+    return this.watchlistService.getWatchlistItem(this.anime?.id || this.anime?.mal_id);
   }
 }

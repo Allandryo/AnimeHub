@@ -111,7 +111,14 @@ interface Tab {
                 @for (item of filteredItems(); track item.animeId) {
                   <div class="list-item glass-card">
                     <a [routerLink]="['/anime', item.animeId]" class="poster-link">
-                      <img [src]="item.imageUrl" [alt]="item.title" class="poster-img" loading="lazy" />
+                      <img
+                        [src]="item.imageUrl"
+                        [alt]="item.title"
+                        class="poster-img"
+                        loading="lazy"
+                        decoding="async"
+                        referrerpolicy="no-referrer"
+                      />
                       <div class="poster-overlay">
                         <span class="material-symbols-outlined">visibility</span>
                       </div>
@@ -318,7 +325,7 @@ export class MyListComponent {
     const query = this.searchQuery().toLowerCase().trim();
     const items = this.activeItems();
     if (!query) return items;
-    return items.filter(item => item.title.toLowerCase().includes(query));
+    return items.filter((item: WatchlistItem) => item.title.toLowerCase().includes(query));
   });
 
   @HostListener('document:click')

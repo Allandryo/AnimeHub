@@ -15,11 +15,21 @@ export class SupabaseService {
   
   // Signals de estado
   readonly currentUser = signal<UserProfile | null>(null);
+  readonly userProfile = this.currentUser.asReadonly();
+  readonly authModalOpen = signal<boolean>(false);
   readonly isLocalMode = signal<boolean>(false);
   readonly isAuthenticated = computed(() => !!this.currentUser());
 
   constructor() {
     this.initConnection();
+  }
+
+  openAuthModal() {
+    this.authModalOpen.set(true);
+  }
+
+  closeAuthModal() {
+    this.authModalOpen.set(false);
   }
 
   private initConnection() {
@@ -31,28 +41,57 @@ export class SupabaseService {
       return;
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Escuchar cambios de sesión
-    this.supabase.auth.onAuthStateChange(async (_, session) => {
-      if (session?.user) {
-        await this.fetchProfile(session.user);
-      } else {
-        this.currentUser.set(null);
-      }
-    });
+    let url = supabaseUrl.trim();
+    if (url.endsWith('/rest/v1') || url.endsWith('/rest/v1/')) {
+      url = url.replace(/\/rest\/v1\/?$/, '');
+    }
+
+    try {
+      this.supabase = createClient(url, supabaseKey);
+      
+      // Escuchar cambios de sesión
+      this.supabase.auth.onAuthStateChange(async (_, session) => {
+        if (session?.user) {
+          await this.fetchProfile(session.user);
+        } else {
+          this.currentUser.set(null);
+        }
+      });
+    } catch (err) {
+      console.warn('Error inicializando Supabase, activando modo local:', err);
+      this.isLocalMode.set(true);
+      this.loadLocalSession();
+    }
   }
 
   // --- AUTENTICACIÓN ---
-  async signUp(email: string, password: string, username: string) {
-    if (this.isLocalMode()) {
+  async signUp(usernameOrEmail: string, emailOrPassword?: string, passwordOrUsername?: string) {
+    let username = '';
+    let email = '';
+    let password = '';
+
+    if (usernameOrEmail.includes('@')) {
+      email = usernameOrEmail;
+      password = emailOrPassword || '';
+      username = passwordOrUsername || email.split('@')[0];
+    } else if (emailOrPassword && emailOrPassword.includes('@')) {
+      username = usernameOrEmail;
+      email = emailOrPassword;
+      password = passwordOrUsername || '';
+    } else {
+      username = usernameOrEmail;
+      email = emailOrPassword || '';
+      password = passwordOrUsername || '';
+    }
+
+    if (this.isLocalMode() || !this.supabase) {
       const mockUser: UserProfile = { id: 'local-user', email, username };
       localStorage.setItem('animehub_user', JSON.stringify(mockUser));
       this.currentUser.set(mockUser);
       return { data: mockUser, error: null };
     }
 
-    const { data, error } = await this.supabase!.auth.signUp({
+    const { data, error } = await this.supabase.auth.signUp({
       email,
       password,
       options: { data: { username } }
@@ -62,7 +101,7 @@ export class SupabaseService {
   }
 
   async signIn(identifier: string, password: string) {
-    if (this.isLocalMode()) {
+    if (this.isLocalMode() || !this.supabase) {
       const mockUser: UserProfile = { id: 'local-user', email: identifier, username: identifier.split('@')[0] };
       localStorage.setItem('animehub_user', JSON.stringify(mockUser));
       this.currentUser.set(mockUser);
@@ -72,7 +111,7 @@ export class SupabaseService {
     let email = identifier;
     // Si ingresa nombre de usuario en lugar de correo, buscamos su email en profiles
     if (!identifier.includes('@')) {
-      const { data, error } = await this.supabase!
+      const { data, error } = await this.supabase
         .from('profiles')
         .select('email')
         .eq('username', identifier)
@@ -82,22 +121,23 @@ export class SupabaseService {
       email = data.email;
     }
 
-    const { error } = await this.supabase!.auth.signInWithPassword({ email, password });
+    const { error } = await this.supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }
 
   async signOut() {
-    if (this.isLocalMode()) {
+    if (this.isLocalMode() || !this.supabase) {
       localStorage.removeItem('animehub_user');
       this.currentUser.set(null);
       return;
     }
-    await this.supabase?.auth.signOut();
+    await this.supabase.auth.signOut();
   }
 
   // --- PERFIL Y STORAGE ---
   private async fetchProfile(user: User) {
-    const { data } = await this.supabase!
+    if (!this.supabase) return;
+    const { data } = await this.supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
@@ -105,6 +145,13 @@ export class SupabaseService {
 
     if (data) {
       this.currentUser.set(data);
+    } else {
+      this.currentUser.set({
+        id: user.id,
+        email: user.email || '',
+        username: user.user_metadata?.['username'] || user.email?.split('@')[0] || 'User',
+        avatar_url: user.user_metadata?.['avatar_url']
+      });
     }
   }
 
@@ -112,7 +159,7 @@ export class SupabaseService {
     const user = this.currentUser();
     if (!user) throw new Error('No autenticado');
 
-    if (this.isLocalMode()) {
+    if (this.isLocalMode() || !this.supabase) {
       const localUrl = URL.createObjectURL(file);
       const updated = { ...user, avatar_url: localUrl };
       this.currentUser.set(updated);
@@ -123,23 +170,29 @@ export class SupabaseService {
     const fileExt = file.name.split('.').pop();
     const filePath = `${user.id}/avatar.${fileExt}`;
 
-    const { error: uploadError } = await this.supabase!.storage
+    const { error: uploadError } = await this.supabase.storage
       .from('avatars')
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) throw uploadError;
 
-    const { data } = this.supabase!.storage.from('avatars').getPublicUrl(filePath);
+    const { data } = this.supabase.storage.from('avatars').getPublicUrl(filePath);
     const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
 
-    await this.supabase!.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
+    await this.supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
     this.currentUser.set({ ...user, avatar_url: avatarUrl });
     return avatarUrl;
   }
 
   private loadLocalSession() {
     const saved = localStorage.getItem('animehub_user');
-    if (saved) this.currentUser.set(JSON.parse(saved));
+    if (saved) {
+      try {
+        this.currentUser.set(JSON.parse(saved));
+      } catch {
+        this.currentUser.set(null);
+      }
+    }
   }
 
   get client(): SupabaseClient | null {

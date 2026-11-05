@@ -39,7 +39,14 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       <div class="details-page">
         @if (a.banner_image || a.images.webp?.large_image_url) {
           <div class="banner-wrapper">
-            <img [src]="a.banner_image || a.images.webp?.large_image_url || a.images.jpg.large_image_url" alt="" class="banner" />
+            <img
+              [src]="a.banner_image || a.images.webp?.large_image_url || a.images.jpg.large_image_url"
+              alt=""
+              class="banner"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+            />
             <div class="banner-overlay"></div>
           </div>
         }
@@ -50,6 +57,9 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
               [src]="a.images.webp?.large_image_url || a.images.jpg.large_image_url"
               [alt]="a.title"
               class="poster"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
             />
           </div>
 

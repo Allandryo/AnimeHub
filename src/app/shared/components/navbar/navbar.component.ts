@@ -40,7 +40,14 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
               <div class="user-profile-menu">
                 <button class="avatar-btn" (click)="toggleDropdown($event)">
                   @if (supabaseService.userProfile()?.avatar_url) {
-                    <img [src]="supabaseService.userProfile()?.avatar_url" alt="Avatar" class="avatar-img">
+                    <img
+                      [src]="supabaseService.userProfile()?.avatar_url"
+                      alt="Avatar"
+                      class="avatar-img"
+                      loading="lazy"
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                    >
                   } @else {
                     <div class="avatar-placeholder">
                       {{ supabaseService.userProfile()?.username?.substring(0, 2)?.toUpperCase() }}
