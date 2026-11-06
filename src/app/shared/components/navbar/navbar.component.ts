@@ -128,6 +128,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         border-radius: 0;
         border-left: none;
         border-right: none;
+        z-index: var(--z-mobile-nav);
       }
     }
 
@@ -401,19 +402,23 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
 
       .nav-links {
         position: fixed;
-        top: 64px;
+        top: 56px;
         left: 0;
         right: 0;
         flex-direction: column;
-        background: rgba(248, 250, 252, 0.98);
+        background: var(--surface);
         backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         border-bottom: 1px solid var(--border);
-        padding: 1.5rem 1rem;
-        gap: 0.35rem;
+        padding: 1.25rem 1rem 1.5rem;
+        gap: 0.5rem;
         transform: translateY(-120%);
         transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
         opacity: 0;
         z-index: var(--z-mobile-nav);
+        box-shadow: var(--shadow-xl);
+        max-height: calc(100vh - 56px);
+        overflow-y: auto;
 
         &.open {
           transform: translateY(0);
@@ -452,8 +457,9 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         position: fixed;
         inset: 0;
         top: 56px;
-        background: rgba(15, 23, 42, 0.3);
+        background: rgba(15, 23, 42, 0.5);
         backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
         z-index: var(--z-mobile-backdrop);
       }
     }

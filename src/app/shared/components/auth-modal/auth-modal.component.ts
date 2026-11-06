@@ -183,6 +183,12 @@ import { SupabaseService } from '../../../core/services/supabase.service';
       box-shadow: var(--shadow-xl);
       border: 1px solid var(--border);
       animation: modalFadeIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+
+      @media (max-width: 480px) {
+        padding: 1.5rem 1.25rem;
+      }
     }
 
     @keyframes modalFadeIn {
