@@ -233,11 +233,16 @@ export class WatchlistService {
     }
 
     try {
-      await this.supabaseService.client
+      const { error } = await this.supabaseService.client
         .from('anime_lists')
         .delete()
         .eq('user_id', user.id)
         .eq('anime_id', animeId);
+
+      if (error) {
+        console.warn('Error deleting anime from Supabase, fallback local:', error);
+        this.saveToLocal(user.id);
+      }
     } catch (e) {
       console.warn('Error deleting anime from Supabase, fallback local:', e);
       this.saveToLocal(user.id);
@@ -256,17 +261,25 @@ export class WatchlistService {
     }
 
     try {
-      await this.supabaseService.client
+      const dbStatus = String(item.status).toLowerCase();
+      const payload = {
+        user_id: user.id,
+        anime_id: item.animeId,
+        status: dbStatus,
+        episodes_watched: item.watchedEpisodes,
+        total_episodes: item.totalEpisodes,
+        anime_data: item.anime_data || {},
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await this.supabaseService.client
         .from('anime_lists')
-        .upsert({
-          user_id: user.id,
-          anime_id: item.animeId,
-          status: item.status,
-          episodes_watched: item.watchedEpisodes,
-          total_episodes: item.totalEpisodes,
-          anime_data: item.anime_data,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,anime_id' });
+        .upsert(payload, { onConflict: 'user_id,anime_id' });
+
+      if (error) {
+        console.warn('Error persisting item to Supabase, fallback local:', error);
+        this.saveToLocal(user.id);
+      }
     } catch (e) {
       console.warn('Error persisting item to Supabase, fallback local:', e);
       this.saveToLocal(user.id);

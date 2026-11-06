@@ -34,7 +34,12 @@ interface Tab {
           }
         </div>
 
-        @if (!supabaseService.isAuthenticated()) {
+        @if (supabaseService.isInitializingSession()) {
+          <div class="loading-state glass-card">
+            <div class="spinner"></div>
+            <p>Comprobando sesión...</p>
+          </div>
+        } @else if (!supabaseService.isAuthenticated()) {
           <div class="empty-state glass-card">
             <span class="material-symbols-outlined empty-icon">lock</span>
             <h3>Inicia sesión para ver tu lista</h3>
@@ -135,13 +140,16 @@ interface Tab {
                           <span class="progress-label">Progreso</span>
                           <span class="progress-numbers">
                             {{ item.watchedEpisodes }} / {{ item.totalEpisodes || '?' }}
-                            <span class="progress-pct">({{ getProgressPercentage(item) }}%)</span>
+                            @if (item.totalEpisodes) {
+                              <span class="progress-pct">({{ getProgressPercentage(item) }}%)</span>
+                            }
                           </span>
                         </div>
                         <div class="progress-track">
                           <div
                             class="progress-fill"
-                            [style.width.%]="getProgressPercentage(item)"
+                            [class.ongoing]="!item.totalEpisodes"
+                            [style.width.%]="item.totalEpisodes ? getProgressPercentage(item) : (item.watchedEpisodes > 0 ? 100 : 0)"
                           ></div>
                         </div>
                       </div>
@@ -265,6 +273,23 @@ interface Tab {
     .progress-numbers { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; }
     .progress-track { width: 100%; height: 6px; background: rgba(0, 0, 0, 0.06); border-radius: 9999px; overflow: hidden; }
     .progress-fill { height: 100%; border-radius: 9999px; background: var(--primary); transition: width 0.4s ease; }
+    .progress-fill.ongoing { background: linear-gradient(90deg, var(--primary), var(--secondary)); opacity: 0.85; }
+    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; border-radius: var(--radius-lg); gap: 1rem; color: var(--text-secondary); }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(255, 107, 107, 0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 640px) {
+      .page-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .page-title { font-size: 2rem; }
+      .tabs-container { padding: 0.25rem; gap: 0.2rem; }
+      .tab-btn { padding: 0.6rem 0.4rem; font-size: 0.8rem; gap: 0.3rem; }
+      .tab-icon { font-size: 1.05rem; }
+      .tab-count { font-size: 0.65rem; padding: 0.1rem 0.35rem; }
+      .list-item { gap: 0.85rem; padding: 0.85rem; }
+      .poster-link { width: 80px; min-height: 115px; }
+      .item-top { flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+      .item-actions { width: 100%; justify-content: flex-start; }
+    }
     .episode-controls { display: flex; align-items: center; gap: 0.75rem; }
     .ep-btn { padding: 0.4rem; border-radius: var(--radius-sm); }
     .ep-count { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 3rem; text-align: center; }
@@ -348,9 +373,9 @@ export class MyListComponent {
 
   getProgressPercentage(item: WatchlistItem): number {
     if (!item.totalEpisodes || item.totalEpisodes === 0) {
-      return item.watchedEpisodes > 0 ? 50 : 0;
+      return 0;
     }
-    return Math.round((item.watchedEpisodes / item.totalEpisodes) * 100);
+    return Math.min(100, Math.max(0, Math.round((item.watchedEpisodes / item.totalEpisodes) * 100)));
   }
 
   incrementEpisode(item: WatchlistItem, event: Event): void {

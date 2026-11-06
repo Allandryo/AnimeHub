@@ -16,6 +16,7 @@ export class SupabaseService {
   // Signals de estado
   readonly currentUser = signal<UserProfile | null>(null);
   readonly userProfile = this.currentUser.asReadonly();
+  readonly isInitializingSession = signal<boolean>(true);
   readonly authModalOpen = signal<boolean>(false);
   readonly isLocalMode = signal<boolean>(false);
   readonly isAuthenticated = computed(() => !!this.currentUser());
@@ -38,6 +39,7 @@ export class SupabaseService {
       console.warn('⚠️ Supabase no configurado. Activando Modo Local (localStorage).');
       this.isLocalMode.set(true);
       this.loadLocalSession();
+      this.isInitializingSession.set(false);
       return;
     }
 
@@ -50,17 +52,31 @@ export class SupabaseService {
       this.supabase = createClient(url, supabaseKey);
       
       // Escuchar cambios de sesión
-      this.supabase.auth.onAuthStateChange(async (_, session) => {
+      this.supabase.auth.onAuthStateChange((_, session) => {
         if (session?.user) {
-          await this.fetchProfile(session.user);
+          // Asignar datos de inmediato para evitar parpadeos y desbloquear la UI
+          this.currentUser.set({
+            id: session.user.id,
+            email: session.user.email || '',
+            username: session.user.user_metadata?.['username'] || session.user.email?.split('@')[0] || 'User',
+            avatar_url: session.user.user_metadata?.['avatar_url']
+          });
+          this.isInitializingSession.set(false);
+
+          // Ejecutar fetchProfile en el siguiente tick para evitar el deadlock con el lock interno de Supabase
+          setTimeout(() => {
+            this.fetchProfile(session.user);
+          }, 0);
         } else {
           this.currentUser.set(null);
+          this.isInitializingSession.set(false);
         }
       });
     } catch (err) {
       console.warn('Error inicializando Supabase, activando modo local:', err);
       this.isLocalMode.set(true);
       this.loadLocalSession();
+      this.isInitializingSession.set(false);
     }
   }
 
@@ -101,20 +117,21 @@ export class SupabaseService {
   }
 
   async signIn(identifier: string, password: string) {
+    const cleanId = identifier.trim();
     if (this.isLocalMode() || !this.supabase) {
-      const mockUser: UserProfile = { id: 'local-user', email: identifier, username: identifier.split('@')[0] };
+      const mockUser: UserProfile = { id: 'local-user', email: cleanId, username: cleanId.split('@')[0] };
       localStorage.setItem('animehub_user', JSON.stringify(mockUser));
       this.currentUser.set(mockUser);
       return;
     }
 
-    let email = identifier;
-    // Si ingresa nombre de usuario en lugar de correo, buscamos su email en profiles
-    if (!identifier.includes('@')) {
+    let email = cleanId;
+    // Si ingresa nombre de usuario en lugar de correo, buscamos su email en profiles (insensible a mayúsculas)
+    if (!cleanId.includes('@')) {
       const { data, error } = await this.supabase
         .from('profiles')
         .select('email')
-        .eq('username', identifier)
+        .ilike('username', cleanId)
         .single();
       
       if (error || !data) throw new Error('Usuario no encontrado');
@@ -137,21 +154,18 @@ export class SupabaseService {
   // --- PERFIL Y STORAGE ---
   private async fetchProfile(user: User) {
     if (!this.supabase) return;
-    const { data } = await this.supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    try {
+      const { data, error } = await this.supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-    if (data) {
-      this.currentUser.set(data);
-    } else {
-      this.currentUser.set({
-        id: user.id,
-        email: user.email || '',
-        username: user.user_metadata?.['username'] || user.email?.split('@')[0] || 'User',
-        avatar_url: user.user_metadata?.['avatar_url']
-      });
+      if (data && !error) {
+        this.currentUser.set(data);
+      }
+    } catch (e) {
+      console.warn('Error fetching profile from Supabase:', e);
     }
   }
 
