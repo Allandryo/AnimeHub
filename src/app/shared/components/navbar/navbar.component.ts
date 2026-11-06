@@ -29,9 +29,6 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
              (click)="closeMobile()">
             <span class="material-symbols-outlined">bookmark</span>
             Mi Lista
-            @if (watchlistCountValue > 0) {
-              <span class="nav-badge">{{ watchlistCountValue }}</span>
-            }
           </a>
 
           <!-- User auth / profile -->
@@ -520,10 +517,5 @@ export class NavbarComponent {
         alert('Error al subir la imagen de perfil.');
       }
     }
-  }
-
-  // Use length for the badge count
-  get watchlistCountValue() {
-    return this.watchlistService.items().length;
   }
 }
